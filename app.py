@@ -1,48 +1,70 @@
 import streamlit as st
-import random
+import pandas as pd
+import joblib
+import os
 
-# Función para generar una nueva ecuación y guardarla en el estado de la sesión
-def generar_ecuacion():
-    a = random.randint(1, 10)
-    x_real = random.randint(-10, 10)
-    b = random.randint(-20, 20)
-    c = a * x_real + b
+# Configuración de la página
+st.set_page_config(page_title="Clasificador de Iris", page_icon="🌸")
+
+st.title("🌸 Clasificador de Flores Iris")
+st.markdown("""
+Esta aplicación permite probar modelos entrenados para predecir la especie de una flor Iris 
+basándose en sus medidas morfológicas.
+""")
+
+# Sidebar para la selección del modelo y parámetros
+st.sidebar.header("Configuración")
+
+# Selección del modelo
+modelo_choice = st.sidebar.selectbox(
+    "Selecciona el modelo:",
+    ("KNN (K-Nearest Neighbors)", "SVM (Support Vector Machine)")
+)
+
+# Cargar el modelo seleccionado
+def cargar_modelo(nombre_archivo):
+    if os.path.exists(nombre_archivo):
+        return joblib.load(nombre_archivo)
+    else:
+        st.error(f"Archivo {nombre_archivo} no encontrado en el repositorio.")
+        return None
+
+if modelo_choice == "KNN (K-Nearest Neighbors)":
+    model = cargar_modelo("modelo_iris_knn.pkl")
+else:
+    model = cargar_modelo("modelo_iris_svm.pkl")
+
+# Inputs de usuario
+st.sidebar.subheader("Medidas de la flor (cm)")
+sepal_length = st.sidebar.slider("Largo del Sépalo", 4.0, 8.0, 5.4)
+sepal_width = st.sidebar.slider("Ancho del Sépalo", 2.0, 4.5, 3.4)
+petal_length = st.sidebar.slider("Largo del Pétalo", 1.0, 7.0, 1.3)
+petal_width = st.sidebar.slider("Ancho del Pétalo", 0.1, 2.5, 0.2)
+
+# Crear un DataFrame con la entrada
+input_data = pd.DataFrame([[sepal_length, sepal_width, petal_length, petal_width]],
+                         columns=['sepal length (cm)', 'sepal width (cm)', 
+                                  'petal length (cm)', 'petal width (cm)'])
+
+# Predicción
+if model is not None:
+    st.subheader("Resultado de la Predicción")
     
-    # Formatear el signo para que se vea natural (ej: 3x - 5 = 10 en lugar de 3x + -5 = 10)
-    signo = "+" if b >= 0 else "-"
-    ecuacion_str = f"{a}x {signo} {abs(b)} = {c}"
-    
-    st.session_state.ecuacion = ecuacion_str
-    st.session_state.respuesta = x_real
-
-# Inicializar el estado de la sesión si es la primera vez que se carga la app
-if 'ecuacion' not in st.session_state:
-    generar_ecuacion()
-
-# Interfaz de usuario
-st.set_page_config(page_title="Reto de Ecuaciones", page_icon="🧮")
-st.title("🧮 Reto de Ecuaciones de Primer Grado")
-st.write("Encuentra el valor exacto de **x** en la siguiente ecuación:")
-
-# Mostrar la ecuación actual
-st.header(st.session_state.ecuacion)
-
-# Entrada del usuario
-respuesta_usuario = st.number_input("Ingresa tu respuesta (x):", step=1)
-
-# Crear columnas para los botones
-col1, col2 = st.columns(2)
-
-with col1:
-    if st.button("✅ Verificar respuesta"):
-        if respuesta_usuario == st.session_state.respuesta:
-            st.success("¡Correcto! Eres un genio de las matemáticas.")
-            st.balloons()  # Animación de éxito
-        else:
-            st.error("Respuesta incorrecta. ¡Sigue intentando!")
-            st.snow()  # Animación de fallo (opcional, puedes quitarla si prefieres)
-
-with col2:
-    if st.button("🔄 Generar nueva ecuación"):
-        generar_ecuacion()
-        st.rerun() # Recarga la app para mostrar la nueva ecuación
+    if st.button("Clasificar"):
+        prediction = model.predict(input_data)
+        
+        # Mapeo de especies (asumiendo orden estándar de Scikit-learn)
+        especies = {0: "Setosa", 1: "Versicolor", 2: "Virginica"}
+        resultado = especies.get(prediction[0], prediction[0])
+        
+        st.success(f"La especie predicha es: **Iris {resultado}**")
+        
+        # Mostrar probabilidades si el modelo lo permite
+        if hasattr(model, "predict_proba"):
+            st.write("---")
+            st.write("**Probabilidades por clase:**")
+            probabilidades = model.predict_proba(input_data)
+            df_probs = pd.DataFrame(probabilidades, columns=["Setosa", "Versicolor", "Virginica"])
+            st.bar_chart(df_probs.T)
+else:
+    st.warning("Por favor, asegúrate de que los archivos .pkl estén en la raíz del repositorio.")
