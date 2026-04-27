@@ -1,70 +1,58 @@
 import streamlit as st
-import pandas as pd
 import joblib
-import os
+import numpy as np
 
 # Configuración de la página
-st.set_page_config(page_title="Clasificador de Iris", page_icon="🌸")
+st.set_page_config(page_title="Clasificador IRIS", page_icon="🌸")
 
-st.title("🌸 Clasificador de Flores Iris")
-st.markdown("""
-Esta aplicación permite probar modelos entrenados para predecir la especie de una flor Iris 
-basándose en sus medidas morfológicas.
-""")
+st.title("🌸 Clasificador de Flores IRIS")
+st.markdown("Prueba tus modelos entrenados de **KNN** y **SVM**.")
 
-# Sidebar para la selección del modelo y parámetros
+# Sidebar para selección de modelo y parámetros
 st.sidebar.header("Configuración")
-
-# Selección del modelo
-modelo_choice = st.sidebar.selectbox(
+tipo_modelo = st.sidebar.selectbox(
     "Selecciona el modelo:",
-    ("KNN (K-Nearest Neighbors)", "SVM (Support Vector Machine)")
+    ("K-Nearest Neighbors (KNN)", "Support Vector Machine (SVM)")
 )
 
 # Cargar el modelo seleccionado
 def cargar_modelo(nombre_archivo):
-    if os.path.exists(nombre_archivo):
-        return joblib.load(nombre_archivo)
-    else:
-        st.error(f"Archivo {nombre_archivo} no encontrado en el repositorio.")
-        return None
+    return joblib.load(nombre_archivo)
 
-if modelo_choice == "KNN (K-Nearest Neighbors)":
-    model = cargar_modelo("modelo_iris_knn.pkl")
+if tipo_modelo == "K-Nearest Neighbors (KNN)":
+    modelo = cargar_modelo('modelo_iris_knn.pkl')
 else:
-    model = cargar_modelo("modelo_iris_svm.pkl")
+    modelo = cargar_modelo('modelo_iris_svm.pkl')
 
-# Inputs de usuario
-st.sidebar.subheader("Medidas de la flor (cm)")
-sepal_length = st.sidebar.slider("Largo del Sépalo", 4.0, 8.0, 5.4)
-sepal_width = st.sidebar.slider("Ancho del Sépalo", 2.0, 4.5, 3.4)
-petal_length = st.sidebar.slider("Largo del Pétalo", 1.0, 7.0, 1.3)
-petal_width = st.sidebar.slider("Ancho del Pétalo", 0.1, 2.5, 0.2)
+# Entrada de datos (Slidars basados en las características del dataset IRIS)
+st.subheader("Entrada de Características")
+col1, col2 = st.columns(2)
 
-# Crear un DataFrame con la entrada
-input_data = pd.DataFrame([[sepal_length, sepal_width, petal_length, petal_width]],
-                         columns=['sepal length (cm)', 'sepal width (cm)', 
-                                  'petal length (cm)', 'petal width (cm)'])
+with col1:
+    sepal_l = st.slider("Largo del Sépalo (cm)", 4.0, 8.0, 5.4)
+    sepal_w = st.slider("Ancho del Sépalo (cm)", 2.0, 4.5, 3.4)
 
-# Predicción
-if model is not None:
-    st.subheader("Resultado de la Predicción")
+with col2:
+    petal_l = st.slider("Largo del Pétalo (cm)", 1.0, 7.0, 1.3)
+    petal_w = st.slider("Ancho del Pétalo (cm)", 0.1, 2.5, 0.2)
+
+# Botón de predicción
+if st.button("Clasificar"):
+    # Preparar los datos
+    features = np.array([[sepal_l, sepal_w, petal_l, petal_w]])
     
-    if st.button("Clasificar"):
-        prediction = model.predict(input_data)
-        
-        # Mapeo de especies (asumiendo orden estándar de Scikit-learn)
-        especies = {0: "Setosa", 1: "Versicolor", 2: "Virginica"}
-        resultado = especies.get(prediction[0], prediction[0])
-        
-        st.success(f"La especie predicha es: **Iris {resultado}**")
-        
-        # Mostrar probabilidades si el modelo lo permite
-        if hasattr(model, "predict_proba"):
-            st.write("---")
-            st.write("**Probabilidades por clase:**")
-            probabilidades = model.predict_proba(input_data)
-            df_probs = pd.DataFrame(probabilidades, columns=["Setosa", "Versicolor", "Virginica"])
-            st.bar_chart(df_probs.T)
-else:
-    st.warning("Por favor, asegúrate de que los archivos .pkl estén en la raíz del repositorio.")
+    # Realizar predicción
+    prediccion = modelo.predict(features)
+    
+    # Mapeo de nombres de especies
+    especies = {0: "Setosa", 1: "Versicolor", 2: "Virginica"}
+    resultado = especies.get(prediccion[0], "Desconocido")
+    
+    st.success(f"La predicción del modelo es: **Iris-{resultado}**")
+    
+    # Mostrar probabilidades si el modelo lo permite
+    if hasattr(modelo, "predict_proba"):
+        st.write("### Probabilidades:")
+        probs = modelo.predict_proba(features)
+        for i, esp in especies.items():
+            st.write(f"{esp}: {probs[0][i]*100:.2f}%")
